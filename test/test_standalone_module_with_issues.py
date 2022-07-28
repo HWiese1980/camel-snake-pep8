@@ -8,7 +8,6 @@ from __future__ import print_function, division, absolute_import
 def camelFunction(camelArg1, camelArg2, camelArg3, camelArg4, camelArg5):
     """Warning given on this is correct: it causes an error if camelArg4 is converted
     to existing variable `camel_arg4`."""
-    camel_arg4 = 333
     class snake_class(object):
         camelArg5 = camelArg3
     snake_class.camelArg1 = camelArg1
@@ -16,7 +15,7 @@ def camelFunction(camelArg1, camelArg2, camelArg3, camelArg4, camelArg5):
     snake_class.camelArg3 = camelArg2
     snake_class.camelArg5 = camelArg5
     camelArg4 = 999
-    return camel_arg4
+    return 333
 
 a_a = 44
 def fF(aA, a, bB, b, cC, c, dD=3, d=a_a): # Test short names and rename to global.
@@ -33,25 +32,16 @@ def fF(aA, a, bB, b, cC, c, dD=3, d=a_a): # Test short names and rename to globa
 myVar = 5
 myVAR = 44
 
-#
-# Test changing a for-loop variable.
-#
 
-for camelVar in range(3):
-    pass
-
-for camelCount, camelVar in enumerate(range(3)):
-    pass
-
-#
-# Test modifying docs.
-#
 
 class _snake_name(object):
     """This is a class that uses `snake_name` as its name to test when `snake_name`
     will be modified by Rope with docs set to change or not."""
-    d = {}
-    d["snake_name"] = "snake_name" # Danger of using docs modifications!
+    d = {"snake_name": "snake_name"}
+#
+# Test multiple assignment.
+#
+
 
 #
 # Test multiple assignment.
