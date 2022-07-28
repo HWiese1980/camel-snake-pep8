@@ -17,6 +17,7 @@ same major version (2 or 3) as the code that is being refactored.
 
 """
 
+
 # NOTE: Someone who knows rope better might have a better way to get all the
 # names and offsets from the files, and perhaps take scoping into account on
 # the warnings.
@@ -57,17 +58,14 @@ BANNER_WIDTH = 78
 if system_os == "Windows":
     BLUE_INFO_COLOR = Fore.BLUE + Back.WHITE + Style.BRIGHT
     YELLOW_WARNING_COLOR = Fore.YELLOW + Back.BLACK + Style.BRIGHT
-    RED_ERROR_COLOR = Fore.RED
-    NEW_NAME_COLOR = Fore.GREEN
-    CURR_NAME_COLOR = Fore.CYAN
 else:
     BLUE_INFO_COLOR = Fore.BLUE + Style.BRIGHT
     YELLOW_WARNING_COLOR = Fore.YELLOW
-    RED_ERROR_COLOR = Fore.RED
-    NEW_NAME_COLOR = Fore.GREEN
-    CURR_NAME_COLOR = Fore.CYAN
     RESET = Style.RESET_ALL
 
+CURR_NAME_COLOR = Fore.CYAN
+NEW_NAME_COLOR = Fore.GREEN
+RED_ERROR_COLOR = Fore.RED
 RESET = Style.RESET_ALL
 
 REJECTED_CHANGE_MAGIC_COOKIE = "_XxX_CamelSnakePep8_PreserveName_XxX_"
@@ -93,11 +91,7 @@ def user_input(*args, **kwargs):
     else:
         print(*args, end="", flush=True)
 
-    if python_version == 2:
-        input_fun = raw_input
-    else:
-        input_fun = input
-
+    input_fun = raw_input if python_version == 2 else input
     if cmdline_args.yes_to_all:
         print("y")
         return "y"
@@ -110,7 +104,7 @@ def save_set_of_all_names_in_module(file_realpath, save_dict):
     """Get the names in the file and save in the dict `save_dict` keyed by
     the realpath."""
     names_in_module = rope_iterate_worder(file_realpath, unfiltered=True)
-    name_set = set(c[0] for c in names_in_module)
+    name_set = {c[0] for c in names_in_module}
     if file_realpath not in save_dict:
         save_dict[file_realpath] = name_set
 
@@ -127,7 +121,7 @@ def save_changes(realpath_list, change, user=True, accepted=True):
     for path in realpath_list:
         if user and accepted:
             user_accepted_changes_sets_dict[path].add(change)
-        elif user and not accepted:
+        elif user:
             user_rejected_changes_sets_dict[path].add(change)
         else:
             rope_rejected_changes_sets_dict[path].add(change)
@@ -251,9 +245,7 @@ def snake_to_camel(name):
     """Convert snake case names to camel case with first word capitalzed.
     Always capitalizes first letter (to handle camel case starting with
     lower case).  Preserves one leading underscore if present."""
-    leading_underscore = False
-    if name and name[0] == "_":
-        leading_underscore = True
+    leading_underscore = bool(name and name[0] == "_")
     name = name[0].upper() + name[1:]
     words = name.split("_")
     if len(words) == 1 or (len(words) == 2 and leading_underscore):
@@ -261,7 +253,7 @@ def snake_to_camel(name):
     cap_words = [w.capitalize() for w in words]
     joined_name = "".join(cap_words)
     if leading_underscore:
-        joined_name = "_" + joined_name
+        joined_name = f"_{joined_name}"
     return joined_name
 
 def get_source_string(fname):
@@ -321,8 +313,7 @@ def filename_to_module_name(fname):
     abs_fname = os.path.realpath(fname)
     relpath = os.path.relpath(abs_fname, relative_dir)
     relpath = relpath[:-3]
-    module_name = relpath.replace(os.path.sep, ".")
-    return module_name
+    return relpath.replace(os.path.sep, ".")
 
 def unique_everseen(iterable, key=None):
     "List unique elements, preserving order. Remember all elements ever seen."
@@ -365,9 +356,11 @@ def glob_pathname(path, exact_num_args=False, windows_only=False):
               + path + "\nfailed to expand.  Treating as literal.", file=sys.stderr)
         globbed = [path]
     if exact_num_args and len(globbed) != exact_num_args:
-        print_error("\nError: The wildcards in the path\n   {}"
-              "\nexpand to more than {} pathnames.".format(path, exact_num_args),
-              file=sys.stderr)
+        print_error(
+            f"\nError: The wildcards in the path\n   {path}\nexpand to more than {exact_num_args} pathnames.",
+            file=sys.stderr,
+        )
+
         sys.exit(1)
     return globbed
 
@@ -412,9 +405,7 @@ def process_param(param, offset):
     first_non_whitespace_index = len(param) - len(param.lstrip())
     offset += first_non_whitespace_index
     param = param.strip()
-    if not param:
-        return []
-    return [param, offset]
+    return [param, offset] if param else []
 
 def get_function_param_names(initial_fun_string, initial_offset, fun_name_string):
     """Parse a function string returned by Rope's `get_function_and_args_in_header`
@@ -446,7 +437,7 @@ def get_function_param_names(initial_fun_string, initial_offset, fun_name_string
     # Make into a list of characters.
     close_paren_index = fun_string.rfind(")") # Note we need rfind here.
     fun_string = fun_string[:close_paren_index+1]
-    fun_list = [c for c in fun_string]
+    fun_list = list(fun_string)
     assert fun_list[close_paren_index] == ")"
     fun_list[close_paren_index] = "," # Map close paren to comma for consistency later.
 
@@ -472,10 +463,8 @@ def get_function_param_names(initial_fun_string, initial_offset, fun_name_string
         comma_index = fun_string.find(",", index)
         if comma_index < 0:
             break
-        arg_string = fun_string[index:comma_index]
-        if arg_string:
-            name_and_offset = process_param(arg_string, offset + index)
-            if name_and_offset:
+        if arg_string := fun_string[index:comma_index]:
+            if name_and_offset := process_param(arg_string, offset + index):
                 final_name_list.append(name_and_offset)
         index = comma_index + 1
 
@@ -637,7 +626,7 @@ def rope_iterate_worder(source_file_name, fun_name_defs=False, fun_arguments=Fal
 
     # Remove duplicates and return.
     unique_changes_generator = unique_everseen(filtered_changes)
-    filtered_changes = [c for c in unique_changes_generator]
+    filtered_changes = list(unique_changes_generator)
     return filtered_changes
 
 def get_renaming_changes(project, module, offset, new_name, name, source_file_name,
@@ -664,8 +653,10 @@ def get_renaming_changes(project, module, offset, new_name, name, source_file_na
         print_warning(err_message.format("SyntaxError", name, new_name, source_file_name))
 
     except:
-        print_warning("Unexpected error in calculating a rename from '{}' to '{}' in file"
-                      "\n   {}".format(name, new_name, source_file_name))
+        print_warning(
+            f"Unexpected error in calculating a rename from '{name}' to '{new_name}' in file\n   {source_file_name}"
+        )
+
         raise
     return None, e
 
@@ -686,9 +677,10 @@ def rope_rename_refactor(project, source_file_name, possible_changes, docs=True)
     module_name = filename_to_module_name(source_file_name)
     module = project.find_module(module_name)
     if module is None:
-        print_warning("Warning: Rope could not find the module '{}' from file\n   "
-                      "'{}'\nas a resource.\n"
-                      .format(module_name, source_file_name))
+        print_warning(
+            f"Warning: Rope could not find the module '{module_name}' from file\n   '{source_file_name}'\nas a resource.\n"
+        )
+
         return False
 
     for name, offset, new_name in possible_changes:
@@ -770,11 +762,8 @@ def rope_rename_refactor(project, source_file_name, possible_changes, docs=True)
             # Query the user.
             print_info("Do the changes? [yncd] ", end="")
             yes_no = user_input("").strip()
-            if not yes_no or yes_no not in "dcyYnN": # Set default reply.
-                if warning:
-                    yes_no = "n"
-                else:
-                    yes_no = "y"
+            if not yes_no or yes_no not in "dcyYnN":
+                yes_no = "n" if warning else "y"
             if yes_no == "c":
                 print_info("\n", "-" * BANNER_WIDTH, "\n", sep="")
                 print_info("Enter a different string: ", end="")
@@ -851,9 +840,9 @@ def parse_args():
         print_error("Error: First argument is not a directory.")
         sys.exit(1)
 
-    project_is_package = False
-    if os.path.exists(os.path.join(project_dir, "__init__.py")):
-        project_is_package = True
+    project_is_package = bool(
+        os.path.exists(os.path.join(project_dir, "__init__.py"))
+    )
 
     fname_list = cmdline_args.modules
     if not fname_list:
@@ -867,10 +856,9 @@ def parse_args():
 
     for f in fname_realpaths:
         if not os.path.isfile(f):
-            print_error("Error: This argument should be a file but is not:\n   {}\n"
-                        .format(f))
+            print_error(f"Error: This argument should be a file but is not:\n   {f}\n")
             sys.exit(1)
-        if not f[-3:] == ".py":
+        if f[-3:] != ".py":
             print_warning("Warning: All arguments after the first must end in '.py' (or"
                           "\nRope will have problems).  This file did not:\n   ", f)
             sys.exit(1)
@@ -885,11 +873,15 @@ def main():
     os.chdir(project_dir)
 
     if project_is_package:
-        print("The project is detected as a Python package in directory:\n   {}"
-              .format(project_dir))
+        print(
+            f"The project is detected as a Python package in directory:\n   {project_dir}"
+        )
+
     else:
-        print("The project is detected to be non-package Python scripts in directory:\n   {}"
-              .format(project_dir))
+        print(
+            f"The project is detected to be non-package Python scripts in directory:\n   {project_dir}"
+        )
+
 
     print("\nThe files to be modified are:")
     for f in fname_list:
@@ -952,8 +944,12 @@ def main():
 
     for filename in fname_list:
         #experiment_with_scoping_classes(project, filename)
-        print_banner("Python module name: " + filename_to_module_name(filename),
-                     char="%", big=True)
+        print_banner(
+            f"Python module name: {filename_to_module_name(filename)}",
+            char="%",
+            big=True,
+        )
+
 
         print_banner("Changing variables assigned in the code.")
         while change_assigned_variables:
